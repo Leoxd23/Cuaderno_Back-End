@@ -1,6 +1,7 @@
 package mx.edu.backendacademico;
 
 // Inicia el contexto de Spring y el servidor embebido a partir del paquete raíz.
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
