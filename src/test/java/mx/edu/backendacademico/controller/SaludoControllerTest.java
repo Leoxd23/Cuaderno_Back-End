@@ -6,18 +6,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-@WebMvcTest(SaludoController.class)
 class SaludoControllerTest {
-    @Autowired
-    private MockMvc mockMvc;
-
     @Test
     void saludoDevuelveMensajeEnJson() throws Exception {
-        mockMvc.perform(get("/api/v1/saludo"))
+        mockMvc().perform(get("/api/v1/saludo"))
             .andExpect(status().isOk())
             .andExpect(content().contentTypeCompatibleWith("application/json"))
             .andExpect(jsonPath("$.mensaje").value("Hola backend"));
@@ -25,7 +20,11 @@ class SaludoControllerTest {
 
     @Test
     void rutaNoDefinidaDevuelve404() throws Exception {
-        mockMvc.perform(get("/api/v1/no-existe"))
+        mockMvc().perform(get("/api/v1/no-existe"))
             .andExpect(status().isNotFound());
+    }
+
+    private MockMvc mockMvc() {
+        return MockMvcBuilders.standaloneSetup(new SaludoController()).build();
     }
 }
