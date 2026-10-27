@@ -1,5 +1,6 @@
 package mx.edu.backendacademico.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
+import mx.edu.backendacademico.domain.Alumno;
+import mx.edu.backendacademico.domain.EstatusAlumno;
 import mx.edu.backendacademico.repository.AlumnoRepositoryEnMemoria;
 import mx.edu.backendacademico.service.AlumnoService;
 import org.junit.jupiter.api.Test;
@@ -66,6 +70,30 @@ class AlumnoControllerTest {
         mockMvc.perform(get("/api/v1/alumnos"))
             .andExpect(status().isOk())
             .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void filtraPorEstatusSinModificarElRepositorioYConservaElContratoSinFiltro() throws Exception {
+        AlumnoRepositoryEnMemoria repository = new AlumnoRepositoryEnMemoria();
+        repository.guardar(new Alumno(null, "A005", "Ada", "ada@universidad.mx", EstatusAlumno.ACTIVO));
+        repository.guardar(new Alumno(null, "B006", "Grace", "grace@universidad.mx", EstatusAlumno.BAJA));
+        List<Alumno> antesDeConsultar = repository.buscarTodos();
+        AlumnoService service = new AlumnoService(repository);
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new AlumnoController(service)).build();
+
+        mockMvc.perform(get("/api/v1/alumnos"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()", is(2)));
+        mockMvc.perform(get("/api/v1/alumnos?estatus=ACTIVO"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()", is(1)))
+            .andExpect(jsonPath("$[0].estatus", is("ACTIVO")));
+        mockMvc.perform(get("/api/v1/alumnos?estatus=BAJA"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()", is(1)))
+            .andExpect(jsonPath("$[0].estatus", is("BAJA")));
+
+        assertEquals(antesDeConsultar, repository.buscarTodos());
     }
 
     private MockMvc mockMvc() {

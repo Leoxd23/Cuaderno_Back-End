@@ -6,8 +6,14 @@ Content-Type: application/json
 
 {"matricula":"A001","nombre":"Ada Lovelace","correo":"ada@universidad.mx"}
 
-### Listar alumnos
+### Listar alumnos sin filtro: devuelve todos los registros
 GET {{baseUrl}}/alumnos
+
+### Filtrar alumnos activos: devuelve sólo estatus ACTIVO
+GET {{baseUrl}}/alumnos?estatus=ACTIVO
+
+### Filtrar alumnos dados de baja: devuelve sólo estatus BAJA
+GET {{baseUrl}}/alumnos?estatus=BAJA
 
 ### Consultar alumno
 GET {{baseUrl}}/alumnos/1
