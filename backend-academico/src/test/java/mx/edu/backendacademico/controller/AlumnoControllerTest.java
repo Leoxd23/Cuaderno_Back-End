@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import mx.edu.backendacademico.exception.GlobalExceptionHandler;
 import mx.edu.backendacademico.repository.AlumnoRepositoryEnMemoria;
 import mx.edu.backendacademico.service.AlumnoService;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,46 @@ class AlumnoControllerTest {
         mockMvc.perform(get("/api/v1/alumnos"))
             .andExpect(status().isOk())
             .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void cuerpoInvalidoDevuelve400ConVariosErroresPorCampo() throws Exception {
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(
+            new AlumnoController(new AlumnoService(new AlumnoRepositoryEnMemoria()))
+        ).setControllerAdvice(new GlobalExceptionHandler()).build();
+
+        mockMvc.perform(post("/api/v1/alumnos")
+                .contentType("application/json")
+                .content("""
+                    {"matricula":"","nombre":"A","correo":"no-es-correo"}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.type", is("urn:backend-academico:problema:DATOS_INVALIDOS")))
+            .andExpect(jsonPath("$.codigo", is("DATOS_INVALIDOS")))
+            .andExpect(jsonPath("$.campos.length()", is(3)));
+    }
+
+    @Test
+    void matriculaDuplicadaDevuelve409ConProblemDetail() throws Exception {
+        AlumnoService service = new AlumnoService(new AlumnoRepositoryEnMemoria());
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(
+            new AlumnoController(service)
+        ).setControllerAdvice(new GlobalExceptionHandler()).build();
+
+        mockMvc.perform(post("/api/v1/alumnos")
+                .contentType("application/json")
+                .content("""
+                    {"matricula":"A001","nombre":"Ada Lovelace","correo":"ada@universidad.mx"}
+                    """))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/alumnos")
+                .contentType("application/json")
+                .content("""
+                    {"matricula":"A001","nombre":"Otra persona","correo":"otra@universidad.mx"}
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.codigo", is("MATRICULA_DUPLICADA")));
     }
 
     private MockMvc mockMvc() {
