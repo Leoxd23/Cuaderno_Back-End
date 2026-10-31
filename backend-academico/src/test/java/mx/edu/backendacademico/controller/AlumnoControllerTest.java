@@ -83,7 +83,7 @@ class AlumnoControllerTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.type", is("urn:backend-academico:problema:DATOS_INVALIDOS")))
             .andExpect(jsonPath("$.codigo", is("DATOS_INVALIDOS")))
-            .andExpect(jsonPath("$.campos.length()", is(3)));
+            .andExpect(jsonPath("$.campos.length()", is(4)));
     }
 
     @Test
@@ -107,6 +107,22 @@ class AlumnoControllerTest {
                     """))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.codigo", is("MATRICULA_DUPLICADA")));
+    }
+
+    @Test
+    void matriculaConEspaciosInternosDevuelve400SinCambiarElCodigoDeError() throws Exception {
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(
+            new AlumnoController(new AlumnoService(new AlumnoRepositoryEnMemoria()))
+        ).setControllerAdvice(new GlobalExceptionHandler()).build();
+
+        mockMvc.perform(post("/api/v1/alumnos")
+                .contentType("application/json")
+                .content("""
+                    {"matricula":"A 001","nombre":"Ada Lovelace","correo":"ada@universidad.mx"}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.codigo", is("DATOS_INVALIDOS")))
+            .andExpect(jsonPath("$.campos[0].campo", is("matricula")));
     }
 
     private MockMvc mockMvc() {
