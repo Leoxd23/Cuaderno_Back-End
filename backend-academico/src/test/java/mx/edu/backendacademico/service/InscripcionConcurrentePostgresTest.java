@@ -12,6 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import mx.edu.backendacademico.exception.OperacionAcademicaException;
 import mx.edu.backendacademico.repository.jpa.InscripcionRepository;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ class InscripcionConcurrentePostgresTest {
     @Autowired private AlumnoService alumnos;
     @Autowired private InscripcionRepository inscripciones;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private DataSource dataSource;
 
     @Test
     void admiteSoloUnAlumnoCuandoDosSolicitudesCompitenPorUnLugar() throws Exception {
@@ -58,7 +60,20 @@ class InscripcionConcurrentePostgresTest {
                 tareas.submit(() -> admitirTrasBarreras(alumnoDosFinal, materiaFinal, listos, inicio)));
 
             assertTrue(listos.await(10, TimeUnit.SECONDS), "Las dos tareas deben estar listas");
-            inicio.countDown();
+            try (var bloqueador = dataSource.getConnection()) {
+                bloqueador.setAutoCommit(false);
+                try (var consulta = bloqueador.prepareStatement(
+                        "SELECT id FROM materias WHERE id = ? FOR UPDATE")) {
+                    consulta.setLong(1, materiaId);
+                    try (var fila = consulta.executeQuery()) {
+                        assertTrue(fila.next(), "La materia de prueba debe existir");
+                    }
+                }
+                inicio.countDown();
+                assertTrue(esperarBloqueosPostgres(2, 10, TimeUnit.SECONDS),
+                    "Las dos sesiones PostgreSQL deben esperar el bloqueo de la fila");
+                bloqueador.commit();
+            }
 
             int admitidos = 0;
             int rechazadosPorCupo = 0;
@@ -80,6 +95,7 @@ class InscripcionConcurrentePostgresTest {
         } finally {
             inicio.countDown();
             tareas.shutdownNow();
+            tareas.awaitTermination(10, TimeUnit.SECONDS);
             if (materiaId != null) {
                 jdbc.update("DELETE FROM inscripciones WHERE materia_id = ?", materiaId);
             }
@@ -102,5 +118,23 @@ class InscripcionConcurrentePostgresTest {
             throw new IllegalStateException("No se liberó la barrera de admisión");
         }
         return servicio.inscribir(alumnoId, materiaId);
+    }
+
+    private boolean esperarBloqueosPostgres(int esperados, long tiempo, TimeUnit unidad)
+            throws InterruptedException {
+        long limite = System.nanoTime() + unidad.toNanos(tiempo);
+        while (System.nanoTime() < limite) {
+            Long bloqueos = jdbc.queryForObject("""
+                SELECT count(*)
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND pid <> pg_backend_pid()
+                  AND wait_event_type = 'Lock'
+                  AND lower(query) LIKE '%materias%'
+                """, Long.class);
+            if (bloqueos != null && bloqueos >= esperados) return true;
+            Thread.sleep(25);
+        }
+        return false;
     }
 }
