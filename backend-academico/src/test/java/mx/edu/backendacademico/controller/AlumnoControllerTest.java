@@ -1,6 +1,7 @@
 package mx.edu.backendacademico.controller;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import java.util.List;
 import mx.edu.backendacademico.domain.*;
@@ -16,6 +17,18 @@ import org.springframework.test.web.servlet.MockMvc;
 class AlumnoControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean AlumnoService service;
+
+    @Test void creaAlumnoCon201YLocationCorrecto() throws Exception {
+        when(service.crear("R901", "Ada Lovelace", "ada@u.mx"))
+            .thenReturn(new Alumno(42L, "R901", "Ada Lovelace", "ada@u.mx", EstatusAlumno.ACTIVO));
+
+        mvc.perform(post("/api/v1/alumnos")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"matricula\":\"R901\",\"nombre\":\"Ada Lovelace\",\"correo\":\"ada@u.mx\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(header().string("Location", "/api/v1/alumnos/42"));
+    }
+
     @Test void listarDevuelveJson() throws Exception {
         when(service.listar()).thenReturn(List.of(new Alumno(1L,"A1","Ada","ada@u.mx",EstatusAlumno.ACTIVO)));
         mvc.perform(get("/api/v1/alumnos")).andExpect(status().isOk()).andExpect(jsonPath("$[0].matricula").value("A1"));
