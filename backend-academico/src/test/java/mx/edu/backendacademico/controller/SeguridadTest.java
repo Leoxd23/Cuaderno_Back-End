@@ -50,4 +50,31 @@ class SeguridadTest {
             .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(DATOS))
             .andExpect(status().isCreated());
     }
+
+    @Test void propietarioPuedeConsultarSuExpediente() throws Exception {
+        when(service.buscar(1L)).thenReturn(
+            new Alumno(1L, "ALUMNO", "Ada", "ada@u.mx", EstatusAlumno.ACTIVO));
+
+        mvc.perform(get("/api/v1/alumnos/1/expediente")
+                .with(httpBasic("alumno", "alumno123")))
+            .andExpect(status().isOk());
+    }
+
+    @Test void usuarioAjenoRecibe403ParaExpedienteAjeno() throws Exception {
+        when(service.buscar(2L)).thenReturn(
+            new Alumno(2L, "OTRO", "Emmy", "emmy@u.mx", EstatusAlumno.ACTIVO));
+
+        mvc.perform(get("/api/v1/alumnos/2/expediente")
+                .with(httpBasic("alumno", "alumno123")))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test void administradorPuedeConsultarExpedienteAjeno() throws Exception {
+        when(service.buscar(2L)).thenReturn(
+            new Alumno(2L, "OTRO", "Emmy", "emmy@u.mx", EstatusAlumno.ACTIVO));
+
+        mvc.perform(get("/api/v1/alumnos/2/expediente")
+                .with(httpBasic("admin", "admin123")))
+            .andExpect(status().isOk());
+    }
 }

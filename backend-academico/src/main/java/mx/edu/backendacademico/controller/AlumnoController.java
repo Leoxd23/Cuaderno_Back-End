@@ -5,6 +5,7 @@ package mx.edu.backendacademico.controller;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
+import java.security.Principal;
 import mx.edu.backendacademico.dto.ActualizarAlumnoRequest;
 import mx.edu.backendacademico.dto.AlumnoMapper;
 import mx.edu.backendacademico.dto.AlumnoResponse;
@@ -19,6 +20,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/alumnos")
@@ -33,6 +37,21 @@ public class AlumnoController {
     // GET consulta sin solicitar cambios de estado de negocio.
     @GetMapping("/{id}")
     public AlumnoResponse buscar(@PathVariable Long id) { return AlumnoMapper.toResponse(service.buscar(id)); }
+
+    // La identidad viene del principal autenticado; el cliente no envía un usuario arbitrario.
+    @GetMapping("/{id}/expediente")
+    public AlumnoResponse expediente(@PathVariable Long id, Principal principal, Authentication autenticacion) {
+        var alumno = service.buscar(id);
+        boolean administrador = autenticacion.getAuthorities().stream()
+            .anyMatch(autoridad -> autoridad.getAuthority().equals("ROLE_ADMIN"));
+        boolean propietario = alumno.matricula().equalsIgnoreCase(principal.getName());
+
+        if (!administrador && !propietario) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Solo el propietario o un administrador pueden consultar este expediente");
+        }
+        return AlumnoMapper.toResponse(alumno);
+    }
 
     // El servicio asigna identidad; ResponseEntity publica 201 y Location.
     @PostMapping
