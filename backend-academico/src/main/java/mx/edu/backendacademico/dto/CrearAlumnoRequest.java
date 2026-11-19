@@ -8,6 +8,6 @@ import jakarta.validation.constraints.Size;
 
 public record CrearAlumnoRequest(
     @NotBlank @Size(max = 30) String matricula,
-    @NotBlank @Size(min = 3, max = 120) String nombre,
-    @NotBlank @Email @Size(max = 160) String correo
+@NotBlank @Size(min = 3, max = 120) String nombre,
+@NotBlank @Email @Size(max = 160) String correo
 ) {}

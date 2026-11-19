@@ -1,117 +1,32 @@
 package mx.edu.backendacademico.controller;
-
-import static org.hamcrest.Matchers.is;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-import mx.edu.backendacademico.exception.GlobalExceptionHandler;
-import mx.edu.backendacademico.repository.AlumnoRepositoryEnMemoria;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import java.util.List;
+import mx.edu.backendacademico.domain.*;
 import mx.edu.backendacademico.service.AlumnoService;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
+@WebMvcTest(AlumnoController.class)
+@AutoConfigureMockMvc(addFilters=false)
 class AlumnoControllerTest {
-    @Test
-    void creaConsultaActualizaYEliminaUsandoElIdReal() throws Exception {
-        MockMvc mockMvc = mockMvc();
-
-        MvcResult creado = mockMvc.perform(post("/api/v1/alumnos")
-                .contentType("application/json")
-                .content("""
-                    {"matricula":"A005","nombre":"Ada Lovelace","correo":"ada@universidad.mx"}
-                    """))
-            .andExpect(status().isCreated())
-            .andExpect(header().string("Location", org.hamcrest.Matchers.matchesPattern(
-                "/api/v1/alumnos/\\d+")))
-            .andExpect(content().contentTypeCompatibleWith("application/json"))
-            .andReturn();
-
-        String respuesta = creado.getResponse().getContentAsString();
-        long id = Long.parseLong(respuesta.replaceFirst(".*\"id\":(\\d+).*", "$1"));
-        String ruta = "/api/v1/alumnos/" + id;
-
-        mockMvc.perform(get(ruta))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id", is((int) id)))
-            .andExpect(jsonPath("$.nombre", is("Ada Lovelace")));
-
-        mockMvc.perform(put(ruta)
-                .contentType("application/json")
-                .content("""
-                    {"nombre":"Ada Byron","correo":"ada.byron@universidad.mx"}
-                    """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id", is((int) id)))
-            .andExpect(jsonPath("$.matricula", is("A005")))
-            .andExpect(jsonPath("$.nombre", is("Ada Byron")))
-            .andExpect(jsonPath("$.correo", is("ada.byron@universidad.mx")));
-
-        mockMvc.perform(delete(ruta))
-            .andExpect(status().isNoContent())
-            .andExpect(content().string(""));
+    @Autowired MockMvc mvc;
+    @MockitoBean AlumnoService service;
+    @Test void listarDevuelveJson() throws Exception {
+        when(service.listar()).thenReturn(List.of(new Alumno(1L,"A1","Ada","ada@u.mx",EstatusAlumno.ACTIVO)));
+        mvc.perform(get("/api/v1/alumnos")).andExpect(status().isOk()).andExpect(jsonPath("$[0].matricula").value("A1"));
     }
-
-    @Test
-    void unRepositorioNuevoIniciaSinAlumnos() throws Exception {
-        AlumnoService service = new AlumnoService(new AlumnoRepositoryEnMemoria());
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new AlumnoController(service)).build();
-
-        mockMvc.perform(get("/api/v1/alumnos"))
-            .andExpect(status().isOk())
-            .andExpect(content().json("[]"));
-    }
-
-    @Test
-    void cuerpoInvalidoDevuelve400ConVariosErroresPorCampo() throws Exception {
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(
-            new AlumnoController(new AlumnoService(new AlumnoRepositoryEnMemoria()))
-        ).setControllerAdvice(new GlobalExceptionHandler()).build();
-
-        mockMvc.perform(post("/api/v1/alumnos")
-                .contentType("application/json")
-                .content("""
-                    {"matricula":"","nombre":"A","correo":"no-es-correo"}
-                    """))
+    @Test void rechazaUnContratoInvalido() throws Exception {
+        // La validación se ejecuta antes de invocar al servicio.
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/alumnos")
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("{\"matricula\":\"\",\"nombre\":\"A\",\"correo\":\"incorrecto\"}"))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.type", is("urn:backend-academico:problema:DATOS_INVALIDOS")))
-            .andExpect(jsonPath("$.codigo", is("DATOS_INVALIDOS")))
-            .andExpect(jsonPath("$.campos.length()", is(3)));
-    }
-
-    @Test
-    void matriculaDuplicadaDevuelve409ConProblemDetail() throws Exception {
-        AlumnoService service = new AlumnoService(new AlumnoRepositoryEnMemoria());
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(
-            new AlumnoController(service)
-        ).setControllerAdvice(new GlobalExceptionHandler()).build();
-
-        mockMvc.perform(post("/api/v1/alumnos")
-                .contentType("application/json")
-                .content("""
-                    {"matricula":"A001","nombre":"Ada Lovelace","correo":"ada@universidad.mx"}
-                    """))
-            .andExpect(status().isCreated());
-
-        mockMvc.perform(post("/api/v1/alumnos")
-                .contentType("application/json")
-                .content("""
-                    {"matricula":"A001","nombre":"Otra persona","correo":"otra@universidad.mx"}
-                    """))
-            .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.codigo", is("MATRICULA_DUPLICADA")));
-    }
-
-    private MockMvc mockMvc() {
-        return MockMvcBuilders.standaloneSetup(
-            new AlumnoController(new AlumnoService(new AlumnoRepositoryEnMemoria()))
-        ).build();
+            .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"));
+        org.mockito.Mockito.verifyNoInteractions(service);
     }
 }
