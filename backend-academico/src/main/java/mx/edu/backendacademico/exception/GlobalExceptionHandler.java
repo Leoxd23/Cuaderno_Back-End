@@ -25,6 +25,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problema(HttpStatus.CONFLICT, "MATRICULA_DUPLICADA", ex.getMessage());
     }
 
+    @ExceptionHandler(ClaveIdempotenciaException.class)
+    ProblemDetail idempotencia(ClaveIdempotenciaException ex) {
+        // 400 para una clave mal formada; 422 cuando la clave ya pertenece a otro contenido.
+        var status = ex.getCodigo().equals("CLAVE_IDEMPOTENCIA_INVALIDA")
+            ? HttpStatus.BAD_REQUEST : HttpStatus.valueOf(422);
+        return problema(status, ex.getCodigo(), ex.getMessage());
+    }
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers,
