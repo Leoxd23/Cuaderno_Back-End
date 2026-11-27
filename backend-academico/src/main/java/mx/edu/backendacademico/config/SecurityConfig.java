@@ -24,7 +24,8 @@ public class SecurityConfig {
             .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
             .requestMatchers("/actuator/**").hasRole("ADMIN")
             .requestMatchers("/api/v1/csrf").authenticated()
-            .requestMatchers(HttpMethod.GET, "/api/v1/alumnos/**").hasAnyRole("ALUMNO", "DOCENTE", "ADMIN")
+            // ALUMNO sólo llega a la consulta individual; el controlador verifica la propiedad.
+            .requestMatchers(HttpMethod.GET, "/api/v1/alumnos/*").hasAnyRole("ALUMNO", "DOCENTE", "ADMIN")
             .requestMatchers("/api/v1/**").hasAnyRole("DOCENTE", "ADMIN")
             .anyRequest().denyAll());
         // 3. Basic autentica credenciales; TLS protege su transporte fuera de localhost.

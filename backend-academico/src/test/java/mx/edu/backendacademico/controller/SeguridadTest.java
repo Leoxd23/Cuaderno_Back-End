@@ -4,9 +4,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import mx.edu.backendacademico.config.SecurityConfig;
 import mx.edu.backendacademico.domain.*;
+import mx.edu.backendacademico.exception.AlumnoNoEncontradoException;
 import mx.edu.backendacademico.service.AlumnoService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,5 +51,41 @@ class SeguridadTest {
         mvc.perform(post("/api/v1/alumnos").with(httpBasic("docente", "docente123"))
             .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(DATOS))
             .andExpect(status().isCreated());
+    }
+
+    @Test void alumnoConsultaSuPropioRegistro() throws Exception {
+        // En el laboratorio, la matrícula del alumno coincide con su nombre de usuario.
+        when(service.buscar(1L)).thenReturn(new Alumno(1L, "ALUMNO", "Ada", "ada@u.mx", EstatusAlumno.ACTIVO));
+        mvc.perform(get("/api/v1/alumnos/1").with(httpBasic("alumno", "alumno123")))
+            .andExpect(status().isOk());
+    }
+
+    @Test void alumnoRecibe403ParaUnRegistroAjeno() throws Exception {
+        when(service.buscar(2L)).thenReturn(new Alumno(2L, "OTRO", "Emmy", "emmy@u.mx", EstatusAlumno.ACTIVO));
+        mvc.perform(get("/api/v1/alumnos/2").with(httpBasic("alumno", "alumno123")))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.codigo").value("ACCESO_DENEGADO"));
+    }
+
+    @Test void alumnoRecibeElMismo403CuandoElRegistroNoExiste() throws Exception {
+        // Un 404 distinto permitiría al alumno descubrir qué identificadores existen.
+        when(service.buscar(99L)).thenThrow(new AlumnoNoEncontradoException(99L));
+        mvc.perform(get("/api/v1/alumnos/99").with(httpBasic("alumno", "alumno123")))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.codigo").value("ACCESO_DENEGADO"));
+    }
+
+    @Test void docenteConsultaCualquierRegistroYConoceLaAusencia() throws Exception {
+        when(service.buscar(2L)).thenReturn(new Alumno(2L, "OTRO", "Emmy", "emmy@u.mx", EstatusAlumno.ACTIVO));
+        when(service.buscar(99L)).thenThrow(new AlumnoNoEncontradoException(99L));
+        mvc.perform(get("/api/v1/alumnos/2").with(httpBasic("docente", "docente123")))
+            .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/alumnos/99").with(httpBasic("docente", "docente123")))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test void alumnoYaNoPuedeListarATodos() throws Exception {
+        mvc.perform(get("/api/v1/alumnos").with(httpBasic("alumno", "alumno123")))
+            .andExpect(status().isForbidden());
     }
 }

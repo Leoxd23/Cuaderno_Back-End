@@ -34,7 +34,7 @@ paths:
   /api/v1/alumnos:
     get:
       summary: Lista alumnos del laboratorio
-      description: Conjunto pequeño sin paginación. Roles ALUMNO, DOCENTE o ADMIN.
+      description: Conjunto pequeño sin paginación. Roles DOCENTE o ADMIN.
       responses:
         '200':
           description: Lista, posiblemente vacía
@@ -77,6 +77,9 @@ paths:
         schema: {type: integer, format: int64}
     get:
       summary: Consulta un alumno
+      description: >-
+        DOCENTE y ADMIN consultan cualquier alumno. ALUMNO sólo consulta el registro cuya
+        matrícula coincide con su usuario; un registro ajeno o inexistente produce el mismo 403.
       responses:
         '200':
           description: Alumno encontrado
@@ -86,7 +89,7 @@ paths:
         '400': {$ref: '#/components/responses/Problema'}
         '404': {$ref: '#/components/responses/Problema'}
         '401': {$ref: '#/components/responses/NoAutenticado'}
-        '403': {$ref: '#/components/responses/Prohibido'}
+        '403': {$ref: '#/components/responses/AccesoDenegado'}
     put:
       summary: Sustituye nombre y correo del alumno
       parameters:
@@ -207,6 +210,11 @@ components:
       description: Falta autenticación válida; con token CSRF ausente una escritura puede ser rechazada antes con 403
     Prohibido:
       description: Rol insuficiente o token CSRF ausente o inválido; error de la cadena de filtros
+    AccesoDenegado:
+      description: Registro ajeno o inexistente para ALUMNO (codigo ACCESO_DENEGADO) o rechazo de la cadena de filtros
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problema'}
     Problema:
       description: Error explicado por el contrato MVC o de aplicación
       content:

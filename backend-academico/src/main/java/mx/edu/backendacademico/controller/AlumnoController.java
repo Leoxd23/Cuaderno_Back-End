@@ -9,8 +9,12 @@ import mx.edu.backendacademico.dto.ActualizarAlumnoRequest;
 import mx.edu.backendacademico.dto.AlumnoMapper;
 import mx.edu.backendacademico.dto.AlumnoResponse;
 import mx.edu.backendacademico.dto.CrearAlumnoRequest;
+import mx.edu.backendacademico.exception.AccesoDenegadoException;
+import mx.edu.backendacademico.exception.AlumnoNoEncontradoException;
 import mx.edu.backendacademico.service.AlumnoService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,9 +34,23 @@ public class AlumnoController {
     @GetMapping
     public List<AlumnoResponse> listar() { return service.listar().stream().map(AlumnoMapper::toResponse).toList(); }
 
-    // GET consulta sin solicitar cambios de estado de negocio.
+    // DOCENTE y ADMIN consultan cualquier alumno; ALUMNO sólo el registro con su matrícula.
     @GetMapping("/{id}")
-    public AlumnoResponse buscar(@PathVariable Long id) { return AlumnoMapper.toResponse(service.buscar(id)); }
+    public AlumnoResponse buscar(@PathVariable Long id, Authentication autenticacion) {
+        boolean personal = autenticacion.getAuthorities().stream().map(GrantedAuthority::getAuthority)
+            .anyMatch(rol -> rol.equals("ROLE_DOCENTE") || rol.equals("ROLE_ADMIN"));
+        if (personal) return AlumnoMapper.toResponse(service.buscar(id));
+        try {
+            // La identidad viene del principal autenticado, nunca de un parámetro del cliente.
+            var alumno = service.buscar(id);
+            if (alumno.matricula().equalsIgnoreCase(autenticacion.getName())) {
+                return AlumnoMapper.toResponse(alumno);
+            }
+        } catch (AlumnoNoEncontradoException ex) {
+            // Ausencia y registro ajeno reciben el mismo 403: un alumno no puede enumerar ids.
+        }
+        throw new AccesoDenegadoException("Sólo el propietario o el personal académico pueden consultar este alumno");
+    }
 
     // El servicio asigna identidad; ResponseEntity publica 201 y Location.
     @PostMapping

@@ -25,6 +25,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problema(HttpStatus.CONFLICT, "MATRICULA_DUPLICADA", ex.getMessage());
     }
 
+    @ExceptionHandler(AccesoDenegadoException.class)
+    ProblemDetail accesoDenegado(AccesoDenegadoException ex) {
+        return problema(HttpStatus.FORBIDDEN, "ACCESO_DENEGADO", ex.getMessage());
+    }
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers,
