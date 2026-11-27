@@ -30,6 +30,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problema(HttpStatus.FORBIDDEN, "ACCESO_DENEGADO", ex.getMessage());
     }
 
+    @ExceptionHandler({org.springframework.transaction.CannotCreateTransactionException.class,
+                       org.springframework.dao.DataAccessResourceFailureException.class})
+    ProblemDetail baseNoDisponible(Exception ex) {
+        // La dependencia no responde: 503 indica una falla temporal, no un error del cliente.
+        log.warn("Base de datos no disponible tipo={}", ex.getClass().getName());
+        return problema(HttpStatus.SERVICE_UNAVAILABLE, "BASE_NO_DISPONIBLE",
+            "La base de datos no está disponible; intenta de nuevo más tarde");
+    }
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers,

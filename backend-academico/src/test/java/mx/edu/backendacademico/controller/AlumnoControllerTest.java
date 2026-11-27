@@ -29,4 +29,10 @@ class AlumnoControllerTest {
             .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"));
         org.mockito.Mockito.verifyNoInteractions(service);
     }
+    @Test void sinBaseDeDatosRespondeUn503Explicito() throws Exception {
+        // Simula la falla con la que JPA reporta que no pudo abrir la transacción.
+        when(service.listar()).thenThrow(new org.springframework.transaction.CannotCreateTransactionException("Sin conexión"));
+        mvc.perform(get("/api/v1/alumnos")).andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.codigo").value("BASE_NO_DISPONIBLE"));
+    }
 }
